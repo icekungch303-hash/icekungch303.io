@@ -3,212 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>กระเป๋าตังไอซ์ซึ - Cloud Sync</title>
+    <title>กระเป๋าตังไอซ์ซึ - Cloud</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { 
-            font-family: 'Kanit', sans-serif; 
-            background-color: #f0fdf4; 
-            -webkit-tap-highlight-color: transparent;
-        }
+        body { font-family: 'Kanit', sans-serif; background-color: #f0fdf4; -webkit-tap-highlight-color: transparent; }
         .mint-gradient { background: linear-gradient(135deg, #34d399 0%, #10b981 100%); }
         .tab-active { background-color: white; color: #059669; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        
         .animate-pop { animation: pop 0.3s ease-out forwards; }
         @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        
-        /* Modal Overlay */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100;
-        }
-        
         .loader-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="pb-24">
+<body class="pb-20">
 
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="fixed inset-0 bg-emerald-50 z-[200] flex flex-col items-center justify-center text-emerald-600">
-        <i data-lucide="loader-2" class="w-10 h-10 loader-spin mb-2"></i>
-        <p class="font-medium">กำลังเตรียมกระเป๋าตังให้ไอซ์ซึ...</p>
+    <!-- ส่วนที่ 1: หน้า Loading (ปรับปรุงเพื่อแจ้งเตือน Error) -->
+    <div id="loading-overlay" class="fixed inset-0 bg-emerald-50 z-[200] flex flex-col items-center justify-center text-emerald-600 px-6 text-center">
+        <div id="loading-spinner" class="mb-4 bg-white p-4 rounded-full shadow-lg">
+            <i data-lucide="loader-2" class="w-10 h-10 loader-spin text-emerald-500"></i>
+        </div>
+        <p id="loading-title" class="font-bold text-lg mb-1">กำลังเชื่อมต่อออนไลน์...</p>
+        <p id="loading-status" class="text-xs text-emerald-400 opacity-70">กระเป๋าตังไอซ์ซึ กำลังซิงค์ข้อมูล</p>
+        
+        <!-- ข้อความช่วยเหลือเมื่อเกิด Error -->
+        <div id="error-help" class="hidden mt-6 p-4 bg-white rounded-2xl shadow-sm border border-rose-100 text-rose-500 text-sm">
+            <p class="font-bold mb-2">ตรวจพบข้อผิดพลาดการตั้งค่า!</p>
+            <p class="mb-2">กรุณาไปที่ Firebase Console และเปิดใช้งาน <b>Anonymous Sign-in</b> ในเมนู Authentication > Sign-in method</p>
+            <button onclick="window.location.reload()" class="mt-2 text-xs underline">ลองใหม่อีกครั้ง</button>
+        </div>
+
+        <button id="skip-loading" onclick="closeLoading()" class="hidden mt-8 text-[10px] underline text-emerald-300">เข้าหน้าแอปโดยไม่รอเน็ต</button>
     </div>
 
-    <!-- Custom Confirm Modal -->
-    <div id="confirm-modal" class="modal-overlay">
-        <div class="bg-white p-6 rounded-[2rem] w-[85%] max-w-sm text-center">
-            <div class="text-4xl mb-4">⚠️</div>
-            <h3 class="text-lg font-bold text-slate-800 mb-2">ยืนยันการลบ?</h3>
-            <p class="text-sm text-slate-500 mb-6">ไอซ์ซึแน่ใจนะว่าจะลบรายการนี้ออก?</p>
+    <!-- ส่วนที่ 2: กล่องยืนยันการลบ -->
+    <div id="delete-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[150] px-6 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-sm text-center shadow-2xl animate-pop">
+            <div class="bg-rose-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 text-3xl">🗑️</div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">ลบรายการนี้?</h3>
+            <p class="text-sm text-slate-500 mb-8">ข้อมูลที่ลบแล้วจะหายไปจากทุกเครื่องทันทีนะไอซ์ซึ</p>
             <div class="flex gap-3">
-                <button onclick="closeModal()" class="flex-1 py-3 bg-slate-100 rounded-xl font-bold text-slate-500">ไม่ใช่</button>
-                <button id="modal-confirm-btn" class="flex-1 py-3 bg-rose-500 rounded-xl font-bold text-white">ใช่ ลบเลย</button>
+                <button onclick="closeDeleteModal()" class="flex-1 py-4 bg-slate-100 rounded-2xl font-bold text-slate-400 active:scale-95 transition-all">ยกเลิก</button>
+                <button id="confirm-delete-btn" class="flex-[1.5] py-4 bg-rose-500 text-white rounded-2xl font-bold shadow-lg shadow-rose-100 active:scale-95 transition-all">ใช่ ลบเลย</button>
             </div>
         </div>
     </div>
 
     <div class="max-w-md mx-auto px-5 py-8">
-        <!-- Header -->
+        <!-- ส่วนที่ 3: หัวข้อและปุ่มเพิ่ม -->
         <header class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-3xl font-bold text-emerald-900">กระเป๋าตังไอซ์ซึ</h1>
-                <p class="text-emerald-600 text-xs font-medium">บันทึกออนไลน์ เชื่อมต่อทุกเครื่อง ☁️</p>
+                <div class="flex items-center gap-1.5 mt-1">
+                    <div id="conn-status-dot" class="w-2 h-2 bg-slate-300 rounded-full"></div>
+                    <p id="conn-status-text" class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Connecting...</p>
+                </div>
             </div>
-            <button onclick="toggleForm()" class="bg-emerald-600 text-white p-3 rounded-2xl shadow-lg active:scale-90 transition-all">
-                <i id="toggle-icon" data-lucide="plus"></i>
+            <button onclick="toggleForm()" class="bg-emerald-600 text-white p-3.5 rounded-2xl shadow-xl shadow-emerald-100 active:scale-90 transition-all">
+                <i id="plus-icon" data-lucide="plus"></i>
             </button>
         </header>
 
-        <!-- Dashboard -->
-        <div class="mint-gradient rounded-[2.5rem] p-7 text-white shadow-xl mb-10 relative overflow-hidden">
+        <!-- ส่วนที่ 4: แดชบอร์ดสรุปยอด -->
+        <div class="mint-gradient rounded-[2.5rem] p-8 text-white shadow-2xl shadow-emerald-200 mb-10 relative overflow-hidden">
             <div class="relative z-10">
-                <p class="text-emerald-50 text-[10px] uppercase font-bold tracking-widest opacity-80 mb-1">ยอดเงินรวมทั้งหมด</p>
-                <h2 id="grand-total" class="text-4xl font-bold mb-6 tracking-tight">฿0.00</h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-white/20 p-4 rounded-3xl border border-white/20">
-                        <div class="flex items-center gap-2 mb-1">
-                            <i data-lucide="wallet" class="w-3 h-3 text-emerald-100"></i>
-                            <p class="text-[9px] text-emerald-50 font-bold uppercase">เงินสด</p>
-                        </div>
+                <p class="text-emerald-50 text-[10px] uppercase font-bold tracking-widest opacity-80 mb-2">ยอดเงินรวมสุทธิ</p>
+                <h2 id="grand-total" class="text-4xl font-extrabold mb-8 tracking-tighter">฿0.00</h2>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-white/20 backdrop-blur-md p-4 rounded-[1.8rem] border border-white/20 shadow-inner">
+                        <p class="text-[9px] text-emerald-50 font-bold uppercase mb-1">💵 เงินสด</p>
                         <p id="total-cash" class="text-lg font-bold">฿0.00</p>
                     </div>
-                    <div class="bg-white/20 p-4 rounded-3xl border border-white/20">
-                        <div class="flex items-center gap-2 mb-1">
-                            <i data-lucide="landmark" class="w-3 h-3 text-emerald-100"></i>
-                            <p class="text-[9px] text-emerald-50 font-bold uppercase">ในบัญชี</p>
-                        </div>
+                    <div class="bg-white/20 backdrop-blur-md p-4 rounded-[1.8rem] border border-white/20 shadow-inner">
+                        <p class="text-[9px] text-emerald-50 font-bold uppercase mb-1">🏦 ในบัญชี</p>
                         <p id="total-bank" class="text-lg font-bold">฿0.00</p>
                     </div>
                 </div>
             </div>
-            <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+            <div class="absolute -top-10 -right-10 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
-        <!-- Add Form -->
-        <div id="tx-form-container" class="hidden animate-pop bg-white rounded-[2rem] p-6 shadow-xl border border-emerald-50 mb-8">
-            <h3 class="font-bold text-emerald-900 mb-5 flex items-center gap-2">
-                <i data-lucide="plus" class="w-4 h-4"></i> จดบันทึกใหม่
-            </h3>
-            <form id="tx-form" class="space-y-4">
-                <div class="bg-emerald-50 p-1 flex rounded-xl">
-                    <button type="button" id="btn-expense" onclick="setTxType('expense')" class="flex-1 py-2 text-sm font-bold rounded-lg tab-active text-rose-500">รายจ่าย</button>
-                    <button type="button" id="btn-income" onclick="setTxType('income')" class="flex-1 py-2 text-sm font-bold rounded-lg text-slate-400">รายรับ</button>
+        <!-- ส่วนที่ 5: ฟอร์มบันทึก (ซ่อนไว้) -->
+        <div id="add-form-container" class="hidden animate-pop bg-white rounded-[2.2rem] p-6 shadow-2xl border border-emerald-50 mb-10">
+            <h3 class="font-bold text-emerald-900 mb-6 flex items-center gap-2">✨ จดบันทึกใหม่</h3>
+            <form id="finance-form" class="space-y-4">
+                <div class="bg-emerald-50 p-1.5 flex rounded-2xl">
+                    <button type="button" id="type-exp" onclick="setTxType('expense')" class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all tab-active text-rose-500">รายจ่าย</button>
+                    <button type="button" id="type-inc" onclick="setTxType('income')" class="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all text-slate-400">รายรับ</button>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <button type="button" id="btn-cash" onclick="setTxMethod('cash')" class="py-2.5 text-xs font-bold rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700">เงินสด</button>
-                    <button type="button" id="btn-bank" onclick="setTxMethod('bank')" class="py-2.5 text-xs font-bold rounded-xl border-2 border-transparent bg-slate-50 text-slate-400">บัญชีธนาคาร</button>
+                    <button type="button" id="meth-cash" onclick="setMethod('cash')" class="py-3 text-xs font-bold rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700">เงินสด</button>
+                    <button type="button" id="meth-bank" onclick="setMethod('bank')" class="py-3 text-xs font-bold rounded-xl border-2 border-transparent bg-slate-50 text-slate-400">บัญชีธนาคาร</button>
                 </div>
                 <div class="space-y-3">
-                    <input type="date" id="in-date" required class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none">
-                    <input type="text" id="in-desc" placeholder="ไอซ์ซึซื้ออะไร?" required class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none">
-                    <input type="number" id="in-amount" step="0.01" placeholder="0.00" required class="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none font-bold text-lg">
+                    <input type="date" id="input-date" required class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-400 transition-all font-medium">
+                    <input type="text" id="input-desc" placeholder="เช่น ค่าข้าวเช้า" required class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-400 transition-all font-medium">
+                    <input type="number" id="input-amount" step="0.01" placeholder="0.00" required class="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-400 transition-all font-bold text-xl">
                 </div>
-                <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="toggleForm()" class="flex-1 font-bold text-emerald-400">ยกเลิก</button>
-                    <button type="submit" class="flex-[2] py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-lg">บันทึกออนไลน์</button>
+                <div class="flex gap-2 pt-4">
+                    <button type="button" onclick="toggleForm()" class="flex-1 font-bold text-emerald-300">ยกเลิก</button>
+                    <button type="submit" class="flex-[2] py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-lg shadow-emerald-50 active:scale-95 transition-all">บันทึกข้อมูลออนไลน์</button>
                 </div>
             </form>
         </div>
 
-        <!-- History List -->
-        <div id="history-list" class="space-y-8"></div>
-
-        <div id="empty-state" class="hidden text-center py-20 opacity-20">
-            <div class="text-6xl mb-4">🍃</div>
-            <p>ยังไม่มีบันทึกนะไอซ์ซึ</p>
-        </div>
+        <!-- ส่วนที่ 6: รายการประวัติ -->
+        <div id="history-content" class="space-y-10"></div>
+        <div id="empty-view" class="hidden text-center py-20 opacity-20"><div class="text-7xl mb-4">🌿</div><p>ยังไม่มีบันทึกนะไอซ์ซึ</p></div>
     </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-emerald-900 text-white px-8 py-3 rounded-full text-sm shadow-2xl opacity-0 transition-opacity pointer-events-none z-[100]">
-        สำเร็จ!
-    </div>
+    <!-- Toast Success -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-emerald-900 text-white px-8 py-3.5 rounded-full text-sm shadow-2xl opacity-0 transition-all duration-300 pointer-events-none z-[200]">บันทึกแล้ว!</div>
 
-    <!-- Firebase SDKs -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
 
-        // Global Variables
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // 1. ตั้งค่า Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAzRDapQ3WGvB-38WiQ94A5Nh5y3HE5sJY",
+            authDomain: "tungice-846ce.firebaseapp.com",
+            projectId: "tungice-846ce",
+            storageBucket: "tungice-846ce.firebasestorage.app",
+            messagingSenderId: "818924098196",
+            appId: "1:818924098196:web:5a691e754105ed14cdda81"
+        };
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'icezu-wallet-pro';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'icezu-wallet-vFinal';
         
         let currentUser = null;
         let curType = 'expense';
         let curMethod = 'cash';
-        let pendingDeleteId = null;
+        let deleteId = null;
 
-        // Initialize Icons
         lucide.createIcons();
 
-        // 1. Authentication
-        const initAuth = async () => {
+        // 2. ระบบ Login อัตโนมัติ (ปรับปรุงการจัดการ Error)
+        const setupApp = async () => {
+            setTimeout(() => {
+                const btn = document.getElementById('skip-loading');
+                if (btn) btn.classList.remove('hidden');
+            }, 7000);
+
             try {
+                // RULE 3: Auth Before Queries
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (error) {
-                console.error("Auth error:", error);
-                document.getElementById('loading-screen').innerHTML = "<p class='text-rose-500 p-10 text-center'>เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณารีเฟรชหน้าเว็บ</p>";
+            } catch (err) {
+                console.error("Auth Error", err);
+                if (err.code === 'auth/configuration-not-found') {
+                    document.getElementById('loading-title').innerText = "ตั้งค่าไม่สำเร็จ";
+                    document.getElementById('loading-status').innerText = "ยังไม่ได้เปิดใช้งานระบบสมาชิกใน Firebase Console";
+                    document.getElementById('error-help').classList.remove('hidden');
+                    document.getElementById('loading-spinner').classList.add('hidden');
+                } else {
+                    closeLoading();
+                }
             }
         };
 
         onAuthStateChanged(auth, (user) => {
-            currentUser = user;
             if (user) {
-                startDataListener(user.uid);
+                currentUser = user;
+                document.getElementById('conn-status-dot').className = "w-2 h-2 bg-emerald-400 rounded-full animate-pulse";
+                document.getElementById('conn-status-text').innerText = "Cloud Connected";
+                document.getElementById('conn-status-text').className = "text-emerald-600 text-[10px] font-bold uppercase tracking-wider";
+                listenToData(user.uid);
             }
         });
 
-        initAuth();
-
-        // 2. Data Listener
-        function startDataListener(uid) {
-            const colRef = collection(db, 'artifacts', appId, 'users', uid, 'transactions');
-            
-            onSnapshot(colRef, (snapshot) => {
-                const transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                render(transactions);
-                document.getElementById('loading-screen').style.display = 'none';
+        // 3. ระบบดึงข้อมูลแบบ Real-time
+        function listenToData(uid) {
+            const path = collection(db, 'artifacts', appId, 'users', uid, 'transactions');
+            onSnapshot(path, (snapshot) => {
+                const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                render(data);
+                closeLoading();
             }, (err) => {
-                console.error("Firestore error:", err);
-                document.getElementById('loading-screen').style.display = 'none';
+                console.error("Database Error", err);
+                closeLoading();
             });
         }
 
-        // 3. Render Logic
+        // 4. การวาดหน้าจอ
         function render(items) {
-            const list = document.getElementById('history-list');
-            const empty = document.getElementById('empty-state');
+            const container = document.getElementById('history-content');
+            const empty = document.getElementById('empty-view');
             
             if (items.length === 0) {
-                list.innerHTML = '';
+                container.innerHTML = '';
                 empty.classList.remove('hidden');
-                updateDash(0, 0, 0);
+                updateDashboard(0, 0, 0);
                 return;
             }
             empty.classList.add('hidden');
 
-            // Sort desc
-            items.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            // Grouping
-            const groups = items.reduce((acc, i) => {
-                const date = new Date(i.date);
-                const mKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const grouped = items.reduce((acc, i) => {
+                const d = new Date(i.date);
+                const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 if (!acc[mKey]) acc[mKey] = { list: [], in: 0, ex: 0 };
                 acc[mKey].list.push(i);
-                if (i.type === 'income') acc[mKey].in += parseFloat(i.amount);
+                if (i.type === 'income') acc[mKey].in += parseFloat(i.amount); 
                 else acc[mKey].ex += parseFloat(i.amount);
                 return acc;
             }, {});
@@ -216,42 +220,41 @@
             let html = '';
             let tCash = 0, tBank = 0;
 
-            Object.keys(groups).sort().reverse().forEach(mk => {
-                const g = groups[mk];
+            Object.keys(grouped).sort().reverse().forEach(mk => {
+                const g = grouped[mk];
                 const [y, m] = mk.split('-');
                 const mLabel = new Date(y, m-1).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
 
                 html += `
-                    <div class="month-block">
-                        <div class="flex justify-between items-end border-b-2 border-emerald-100 pb-2 mb-4">
+                    <div class="month-block animate-pop">
+                        <div class="flex justify-between items-end border-b-2 border-emerald-100 pb-3 mb-5 px-1">
                             <h3 class="font-bold text-emerald-900">${mLabel}</h3>
-                            <div class="text-[10px] text-right font-bold uppercase">
-                                <span class="text-emerald-500">รับ ฿${g.in.toLocaleString()}</span>
-                                <span class="mx-1 text-emerald-200">/</span>
-                                <span class="text-rose-400">จ่าย ฿${g.ex.toLocaleString()}</span>
+                            <div class="text-[10px] text-right font-bold uppercase leading-tight">
+                                <span class="text-emerald-500">บวก ฿${g.in.toLocaleString()}</span><br>
+                                <span class="text-rose-400">ลบ ฿${g.ex.toLocaleString()}</span>
                             </div>
                         </div>
-                        <div class="space-y-3">
+                        <div class="space-y-4">
                 `;
 
-                g.list.forEach(item => {
+                g.list.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
                     const isInc = item.type === 'income';
                     html += `
-                        <div class="bg-white p-3 rounded-[1.5rem] flex items-center justify-between shadow-sm border border-emerald-50 animate-pop">
-                            <div class="flex items-center gap-3 overflow-hidden flex-1">
-                                <div class="w-10 h-10 min-w-[40px] rounded-2xl flex items-center justify-center text-xl ${isInc ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}">
+                        <div class="bg-white p-4 rounded-[1.8rem] flex items-center justify-between shadow-sm border border-emerald-50">
+                            <div class="flex items-center gap-4 flex-1 min-w-0">
+                                <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${isInc ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex-shrink-0">
                                     <i data-lucide="${item.method === 'cash' ? 'wallet' : 'landmark'}" class="w-5 h-5"></i>
                                 </div>
-                                <div class="overflow-hidden">
+                                <div class="truncate">
                                     <p class="text-sm font-semibold text-slate-700 leading-tight truncate">${item.description}</p>
-                                    <p class="text-[9px] text-emerald-400 font-bold uppercase">${new Date(item.date).toLocaleDateString('th-TH', {day:'numeric', month:'short'})} • ${item.method === 'cash' ? 'เงินสด' : 'ในบัญชี'}</p>
+                                    <p class="text-[9px] text-emerald-400 font-bold uppercase tracking-widest mt-1">${new Date(item.date).toLocaleDateString('th-TH', {day:'numeric', month:'short'})} • ${item.method === 'cash' ? 'เงินสด' : 'บัญชี'}</p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-3 pl-2">
-                                <span class="font-bold text-sm whitespace-nowrap ${isInc ? 'text-emerald-500' : 'text-rose-500'}">
+                            <div class="flex items-center gap-4 ml-2">
+                                <span class="font-bold text-sm ${isInc ? 'text-emerald-500' : 'text-rose-500'}">
                                     ${isInc ? '+' : '-'}${parseFloat(item.amount).toLocaleString()}
                                 </span>
-                                <button onclick="window.askDelete('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-rose-50 text-rose-400 rounded-xl hover:bg-rose-500 hover:text-white transition-all active:scale-90">
+                                <button onclick="window.triggerDelete('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-300 rounded-xl hover:bg-rose-500 hover:text-white transition-all active:scale-90">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -261,106 +264,101 @@
                 html += `</div></div>`;
             });
 
-            // Calc Dashboard
             items.forEach(i => {
                 const a = parseFloat(i.amount);
                 const m = i.type === 'income' ? 1 : -1;
                 if (i.method === 'cash') tCash += (a*m); else tBank += (a*m);
             });
 
-            list.innerHTML = html;
-            updateDash(tCash, tBank, tCash+tBank);
+            container.innerHTML = html;
+            updateDashboard(tCash, tBank, tCash+tBank);
             lucide.createIcons();
         }
 
-        function updateDash(c, b, t) {
-            document.getElementById('grand-total').innerText = `฿${t.toLocaleString(undefined, {minimumFractionDigits:2})}`;
-            document.getElementById('total-cash').innerText = `฿${c.toLocaleString()}`;
-            document.getElementById('total-bank').innerText = `฿${b.toLocaleString()}`;
-        }
+        // 5. ระบบบันทึก
+        document.getElementById('finance-form').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!currentUser) {
+                alert("กรุณารอการเชื่อมต่อออนไลน์ให้เสร็จสิ้น");
+                return;
+            }
+            const desc = document.getElementById('input-desc');
+            const amt = document.getElementById('input-amount');
+            const date = document.getElementById('input-date');
 
-        // Global functions for HTML
+            try {
+                const path = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'transactions');
+                await addDoc(path, {
+                    description: desc.value,
+                    amount: parseFloat(amt.value),
+                    date: date.value,
+                    type: curType,
+                    method: curMethod,
+                    createdAt: new Date().toISOString()
+                });
+                desc.value = ''; amt.value = '';
+                window.toggleForm();
+                showToast();
+            } catch (err) { alert("บันทึกออนไลน์ไม่สำเร็จ"); }
+        };
+
+        // 6. ฟังก์ชันเสริม
+        window.closeLoading = () => document.getElementById('loading-overlay').style.display = 'none';
+        
         window.toggleForm = () => {
-            const container = document.getElementById('tx-form-container');
-            const icon = document.getElementById('toggle-icon');
-            container.classList.toggle('hidden');
-            const isHidden = container.classList.contains('hidden');
-            icon.setAttribute('data-lucide', isHidden ? 'plus' : 'x');
+            const f = document.getElementById('add-form-container');
+            const ic = document.getElementById('plus-icon');
+            f.classList.toggle('hidden');
+            ic.setAttribute('data-lucide', f.classList.contains('hidden') ? 'plus' : 'x');
             lucide.createIcons();
         };
 
         window.setTxType = (t) => {
             curType = t;
-            document.getElementById('btn-expense').className = t === 'expense' ? "flex-1 py-2 text-sm font-bold rounded-lg tab-active text-rose-500" : "flex-1 py-2 text-sm font-bold rounded-lg text-slate-400";
-            document.getElementById('btn-income').className = t === 'income' ? "flex-1 py-2 text-sm font-bold rounded-lg tab-active text-emerald-600" : "flex-1 py-2 text-sm font-bold rounded-lg text-slate-400";
+            document.getElementById('type-exp').className = t === 'expense' ? "flex-1 py-2.5 text-sm font-bold rounded-xl transition-all tab-active text-rose-500" : "flex-1 py-2.5 text-sm font-bold rounded-xl transition-all text-slate-400";
+            document.getElementById('type-inc').className = t === 'income' ? "flex-1 py-2.5 text-sm font-bold rounded-xl transition-all tab-active text-emerald-600" : "flex-1 py-2.5 text-sm font-bold rounded-xl transition-all text-slate-400";
         };
 
-        window.setTxMethod = (m) => {
+        window.setMethod = (m) => {
             curMethod = m;
-            document.getElementById('btn-cash').className = m === 'cash' ? "py-2.5 text-xs font-bold rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700" : "py-2.5 text-xs font-bold rounded-xl border-2 border-transparent bg-slate-50 text-slate-400";
-            document.getElementById('btn-bank').className = m === 'bank' ? "py-2.5 text-xs font-bold rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700" : "py-2.5 text-xs font-bold rounded-xl border-2 border-transparent bg-slate-50 text-slate-400";
+            document.getElementById('meth-cash').className = m === 'cash' ? "py-3 text-xs font-bold rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700" : "py-3 text-xs font-bold rounded-xl border-2 border-transparent bg-slate-50 text-slate-400";
+            document.getElementById('meth-bank').className = m === 'bank' ? "py-3 text-xs font-bold rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700" : "py-3 text-xs font-bold rounded-xl border-2 border-transparent bg-slate-50 text-slate-400";
         };
 
-        window.askDelete = (id) => {
-            pendingDeleteId = id;
-            document.getElementById('confirm-modal').style.display = 'flex';
+        window.triggerDelete = (id) => {
+            deleteId = id;
+            document.getElementById('delete-modal').style.display = 'flex';
         };
 
-        window.closeModal = () => {
-            document.getElementById('confirm-modal').style.display = 'none';
-            pendingDeleteId = null;
+        window.closeDeleteModal = () => {
+            document.getElementById('delete-modal').style.display = 'none';
+            deleteId = null;
         };
 
-        document.getElementById('modal-confirm-btn').onclick = async () => {
-            if (pendingDeleteId && currentUser) {
+        document.getElementById('confirm-delete-btn').onclick = async () => {
+            if (deleteId && currentUser) {
                 try {
-                    const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'transactions', pendingDeleteId);
+                    const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'transactions', deleteId);
                     await deleteDoc(docRef);
-                    closeModal();
-                    showToast('ลบรายการแล้ว');
-                } catch (e) {
-                    alert("ลบไม่สำเร็จ");
-                }
+                    closeDeleteModal();
+                } catch (e) { alert("ลบไม่สำเร็จ"); }
             }
         };
 
-        function showToast(m) {
+        function updateDashboard(c, b, t) {
+            document.getElementById('grand-total').innerText = `฿${t.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+            document.getElementById('total-cash').innerText = `฿${c.toLocaleString()}`;
+            document.getElementById('total-bank').innerText = `฿${b.toLocaleString()}`;
+        }
+
+        function showToast() {
             const t = document.getElementById('toast');
-            t.innerText = m;
             t.classList.replace('opacity-0', 'opacity-100');
             setTimeout(() => t.classList.replace('opacity-100', 'opacity-0'), 2500);
         }
 
-        // Form Submit
-        document.getElementById('tx-form').onsubmit = async (e) => {
-            e.preventDefault();
-            if (!currentUser) return;
-
-            const descInput = document.getElementById('in-desc');
-            const amtInput = document.getElementById('in-amount');
-            const dateInput = document.getElementById('in-date');
-
-            try {
-                const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'transactions');
-                await addDoc(colRef, {
-                    description: descInput.value,
-                    amount: parseFloat(amtInput.value),
-                    date: dateInput.value,
-                    type: curType,
-                    method: curMethod,
-                    createdAt: new Date().toISOString()
-                });
-                
-                descInput.value = '';
-                amtInput.value = '';
-                window.toggleForm();
-                showToast('บันทึกสำเร็จ');
-            } catch (err) {
-                alert("บันทึกไม่สำเร็จ");
-            }
-        };
-
-        document.getElementById('in-date').valueAsDate = new Date();
+        setupApp();
+        document.getElementById('input-date').valueAsDate = new Date();
     </script>
 </body>
 </html>
